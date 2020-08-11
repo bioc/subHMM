@@ -1,0 +1,140 @@
+%\VignetteIndexEntry{subHMM Vignette}
+%\VignettePackage{subHMM}
+%\VigetteDepends{subHMM}
+
+\documentclass[a4paper]{article}
+%\usepackage{url}
+
+\begin{document}
+
+\title{The SubHMM Model for Identifying Tumor Subclones}
+\maketitle
+
+\tableofcontents
+\newpage
+
+
+\section*{Introduction}
+ Somatic copy number alterations (SCNA) are genetic changes in the cancer genome where
+the copy number of tumor cells departs from two copies through copy number deletion or
+amplification. SCNA analysis is used to identify genes with an abnormal copy number that
+will contribute to carcinogenesis and cancer progression.
+
+There are a number of analytical challenges in studying SCNA.
+First, the average copy number across chromosomes, called ploidy, may not be two and has
+to be estimated and adjusted for in the analysis. Second, there are various types of SCNA,
+some of which share the same total copy number. To distinguish them, allele-specific copy
+number alteration (ASCNA) analysis is preferred, which infers both the total copy number
+and the minor copy number in each allele. ASCNA analysis is essential in identifying
+copy-neutral LOH (loss of heterozygosity), which refers to one copy of the heterogeneous
+allele being lost and the other being duplicated. Third, tumor tissue generally contains a
+mixture of tumor and normal cells; this type of heterogeneity, called tumor purity, needs to
+be accounted for to obtain correct inference about ASCNA. Finally, tumor cells themselves
+are heterogeneous with distinct copy number profiles reflecting a dominant (mainclone)
+and a minor (subclone) clone. Identifying main- and sub-clonal ASCNA across the genome
+helps researchers understand the metastatic potential of the tumor. This inturn, may
+provide insight for targeted therapy on a particular patient.
+
+The subHMM package incorporates a hidden Markov model for subHMM that identifies 
+both main- and subclone across the genome. 
+
+\section{Installation}
+Installing the subHMM package from Bioconductor or Github.
+\subsection{Install from Bioconductor}
+<<install subHMM>>=
+if (!requireNamespace("BiocManager", quietly = TRUE)) install.packages("BiocManager") 
+BiocManager::install("subHMM") 
+@
+
+\subsection{Install the developmental version from Github}
+<<install subHMM from Github>>=
+ #devtools::install_github("binzhulab/subHMM") 
+@
+
+\section{Loading the package}
+Before using the subHMM package, it must be loaded into an R session.
+<<start>>=
+library(subHMM)
+@
+
+\section{Example}
+We start with a file containing the SNP read counts. To input and pre-process
+this data, we will use the facets R package available on github. 
+
+\subsection{Install facets from Github and load the package}
+<<install facets>>=
+  devtools::install_github("mskcc/facets") 
+  library(facets)
+@
+
+\subsection{SNP read count file}
+The data consist of whole exom sequencing data for renal cell carcinoma
+which contains read counts and read depths over entire chromosomes for both
+normal and tumor samples within the same patient. Similar data is available
+from the TCGA project (https://cancergenome.nih.gov). We will read in the file
+using the readSnpMatrix function in the facets package.
+<<SNP read count file>>=
+readCountFile <- system.file("sampleData", "snpData.txt.gz", package="subHMM")
+rcmat  <- readSnpMatrix(readCountFile)
+rcmat[1:5,]
+@
+
+\subsection{Preprocess the data}
+The SNPs in a genome are not evenly spaced, and some regions have multiple SNPs 
+in a small neighborhood which induces serial correlation in the data. 
+To avoid this, we call the preProcSample function in the facets package. 
+However, a seed must be set in order to reproduce results.
+<<preProcSample>>=
+set.seed(123)
+obj <- preProcSample(rcmat)
+@
+
+\subsection{Process the data}
+Process the output from preProcSample. The output will contain the estimates
+of logR and logOR along with chromosome and location information that
+the subhmm function needs.
+<<procSample>>=
+obj <- procSample(obj)
+@
+
+\subsection{Input arguments to subhmm}
+The subhmm function requires a vectors of log(ratio) and log(odds ratio) values,
+along with a matrix or data frame containing the chromosome and location.
+<<jointseg>>=
+set.seed(123)
+tmp    <- obj$jointseg
+logR   <- tmp[, "cnlr"]
+logOR  <- tmp[, "valor"]
+chrLoc <- tmp[, c("chrom", "maploc")]
+@
+
+\subsection{Calling rebet and summarizing results}
+With all of the input arguments being defined, the subhmm function can be called.
+<<call subhmm>>=
+ret <- subhmm(logR, logOR, chrLoc)
+@
+
+From the returned list, we can see the estimated parameters and standard errors.
+In particular, the estimated purity is 0.95, which indicates that the tumor sample
+contains 95\% tumor cells. The estimated ploidy of 2 refers to no loss of
+chromosomes in the tumor sample.
+<<est parms>>=
+ret$parms
+ret$se.parms
+@
+
+The main-clonal regions are given by:
+<<est parms>>=
+ret$mainclone.segments
+@
+
+
+
+\section{Session Information}
+<<sessionInfo>>=
+sessionInfo()
+@ 
+
+\end{document}
+
+
