@@ -1,0 +1,8 @@
+import(stats)
+import(utils)
+import(graphics)
+import(grDevices)
+importFrom(stringr, str_count)
+importFrom(numDeriv, hessian)
+useDynLib(subHMM)
+export(subhmm, subhmm_stage2)
